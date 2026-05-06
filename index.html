@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>財富管家 Pro</title>
+    <!-- 使用 CDN 載入 React 與 Tailwind，確保 GitHub 部署不需要編譯過程 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- 常數定義 ---
+        const ASSET_CATEGORIES = {
+            cash: { label: '現金', color: '#10b981' },
+            stock: { label: '股票', color: '#3b82f6' },
+            fund: { label: '基金', color: '#8b5cf6' },
+            realestate: { label: '不動產', color: '#f59e0b' },
+            debt: { label: '負債', color: '#ef4444' }
+        };
+
+        // --- 內嵌 SVG 圖示 ---
+        const Icon = ({ name, size = 20 }) => {
+            const icons = {
+                dashboard: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>,
+                list: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>,
+                wallet: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>,
+                globe: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>,
+                plus: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            };
+            return icons[name] || null;
+        };
+
+        // --- 主應用程式 ---
+        function App() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [usdRate, setUsdRate] = useState(32.5);
+            const [assets, setAssets] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('wealth_assets_v3');
+                    return saved ? JSON.parse(saved) : [{ id: '1', name: '主要帳戶', type: 'cash', value: 100000, currency: 'TWD', date: new Date().toISOString().split('T')[0] }];
+                } catch (e) { return []; }
+            });
+            const [transactions, setTransactions] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('wealth_tx_v3');
+                    return saved ? JSON.parse(saved) : [];
+                } catch (e) { return []; }
+            });
+
+            // 表單狀態
+            const [txForm, setTxForm] = useState({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0] });
+            const [assetForm, setAssetForm] = useState({ name: '', type: 'cash', value: '', currency: 'TWD', date: new Date().toISOString().split('T')[0] });
+
+            useEffect(() => {
+                localStorage.setItem('wealth_assets_v3', JSON.stringify(assets));
+                localStorage.setItem('wealth_tx_v3', JSON.stringify(transactions));
+            }, [assets, transactions]);
+
+            const formatMoney = (val) => `NT$ ${Math.floor(val).toLocaleString()}`;
+
+            const totalNetWorth = useMemo(() => {
+                const assetValue = assets.reduce((acc, a) => {
+                    const v = a.currency === 'USD' ? a.value * usdRate : a.value;
+                    return a.type === 'debt' ? acc - v : acc + v;
+                }, 0);
+                const cashFlow = transactions.reduce((acc, t) => t.type === 'income' ? acc + t.amount : acc - t.amount, 0);
+                return assetValue + cashFlow;
+            }, [assets, transactions, usdRate]);
+
+            const handleAddTx = (e) => {
+                e.preventDefault();
+                if (!txForm.amount || !txForm.category) return;
+                setTransactions([{ ...txForm, id: Date.now().toString(), amount: Number(txForm.amount) }, ...transactions]);
+                setTxForm({ ...txForm, amount: '', category: '' });
+                setActiveTab('dashboard');
+            };
+
+            const handleAddAsset = (e) => {
+                e.preventDefault();
+                if (!assetForm.name || !assetForm.value) return;
+                setAssets([{ ...assetForm, id: Date.now().toString(), value: Number(assetForm.value) }, ...assets]);
+                setAssetForm({ ...assetForm, name: '', value: '' });
+                setActiveTab('dashboard');
+            };
+
+            return (
+                <div className="flex flex-col h-screen max-w-md mx-auto bg-white shadow-xl relative overflow-hidden">
+                    {/* Header */}
+                    <header className="p-6 bg-white border-b sticky top-0 z-10 flex justify-between items-center">
+                        <div>
+                            <h1 className="text-xl font-black tracking-tight text-slate-900">財富管家 Pro</h1>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Wealth Manager v3.0</p>
+                        </div>
+                        <div className="bg-slate-100 p-2 rounded-xl flex items-center gap-2">
+                            <Icon name="globe" size={14} />
+                            <input 
+                                type="number" 
+                                value={usdRate} 
+                                onChange={e => setUsdRate(Number(e.target.value))}
+                                className="w-12 bg-transparent text-xs font-black outline-none text-emerald-600"
+                            />
+                        </div>
+                    </header>
+
+                    {/* Content */}
+                    <main className="flex-1 overflow-y-auto p-6 pb-32 custom-scroll">
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-6 animate-fade-in">
+                                <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 p-8 rounded-[2.5rem] text-white shadow-lg shadow-emerald-100">
+                                    <p className="text-emerald-100 text-[10px] font-black uppercase tracking-widest mb-1 opacity-80">當前預估淨資產</p>
+                                    <h2 className="text-3xl font-black tracking-tighter">{formatMoney(totalNetWorth)}</h2>
+                                </div>
+
+                                <section>
+                                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">最近收支</h3>
+                                    <div className="space-y-3">
+                                        {transactions.slice(0, 5).map(t => (
+                                            <div key={t.id} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                                <div>
+                                                    <p className="font-bold text-sm">{t.category}</p>
+                                                    <p className="text-[10px] text-slate-400">{t.date}</p>
+                                                </div>
+                                                <p className={`font-black ${t.type === 'income' ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                    {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
+                                                </p>
+                                            </div>
+                                        ))}
+                                        {transactions.length === 0 && <p className="text-center py-8 text-slate-300 font-bold italic">尚無資料</p>}
+                                    </div>
+                                </section>
+                            </div>
+                        )}
+
+                        {activeTab === 'transactions' && (
+                            <div className="animate-fade-in space-y-6">
+                                <form onSubmit={handleAddTx} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-200 space-y-4">
+                                    <h3 className="font-black text-center text-slate-600">新增收支紀錄</h3>
+                                    <div className="flex bg-white p-1 rounded-xl gap-1">
+                                        <button type="button" onClick={() => setTxForm({...txForm, type: 'expense'})} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${txForm.type === 'expense' ? 'bg-red-500 text-white shadow-md' : 'text-slate-400'}`}>支出</button>
+                                        <button type="button" onClick={() => setTxForm({...txForm, type: 'income'})} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${txForm.type === 'income' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400'}`}>收入</button>
+                                    </div>
+                                    <input type="text" placeholder="項目內容" value={txForm.category} onChange={e=>setTxForm({...txForm, category: e.target.value})} className="w-full p-4 rounded-2xl border-none outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all font-bold" />
+                                    <input type="number" placeholder="金額" value={txForm.amount} onChange={e=>setTxForm({...txForm, amount: e.target.value})} className="w-full p-4 rounded-2xl border-none outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all font-black text-xl" />
+                                    <button type="submit" className="w-full bg-slate-900 text-white p-4 rounded-2xl font-black shadow-xl active:scale-95 transition-transform">確認儲存</button>
+                                </form>
+                            </div>
+                        )}
+
+                        {activeTab === 'assets' && (
+                            <div className="animate-fade-in space-y-6">
+                                <form onSubmit={handleAddAsset} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-200 space-y-4">
+                                    <h3 className="font-black text-center text-slate-600">資產現況更新</h3>
+                                    <input type="text" placeholder="資產名稱 (如：玉山銀行)" value={assetForm.name} onChange={e=>setAssetForm({...assetForm, name: e.target.value})} className="w-full p-4 rounded-2xl border-none outline-none font-bold" />
+                                    <select value={assetForm.type} onChange={e=>setAssetForm({...assetForm, type: e.target.value})} className="w-full p-4 rounded-2xl border-none outline-none font-bold bg-white">
+                                        {Object.keys(ASSET_CATEGORIES).map(k => <option key={k} value={k}>{ASSET_CATEGORIES[k].label}</option>)}
+                                    </select>
+                                    <input type="number" placeholder="目前餘額" value={assetForm.value} onChange={e=>setAssetForm({...assetForm, value: e.target.value})} className="w-full p-4 rounded-2xl border-none outline-none font-black text-xl" />
+                                    <button type="submit" className="w-full bg-emerald-600 text-white p-4 rounded-2xl font-black shadow-xl active:scale-95 transition-transform">更新資產</button>
+                                </form>
+
+                                <div className="space-y-3">
+                                    {assets.map(a => (
+                                        <div key={a.id} className="bg-white p-5 rounded-[1.5rem] border border-slate-100 flex justify-between items-center shadow-sm">
+                                            <div>
+                                                <span className="text-[9px] font-black px-2 py-0.5 rounded text-white mb-1 inline-block" style={{backgroundColor: ASSET_CATEGORIES[a.type].color}}>{ASSET_CATEGORIES[a.type].label}</span>
+                                                <p className="font-black text-slate-800">{a.name}</p>
+                                            </div>
+                                            <p className="font-black text-lg">{formatMoney(a.value)}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Navigation */}
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-slate-900/90 backdrop-blur-md rounded-[2.5rem] p-2 flex justify-around items-center shadow-2xl border border-white/10">
+                        <button onClick={() => setActiveTab('dashboard')} className={`p-4 rounded-full transition-all ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400'}`}>
+                            <Icon name="dashboard" />
+                        </button>
+                        <button onClick={() => setActiveTab('transactions')} className={`p-4 rounded-full transition-all ${activeTab === 'transactions' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400'}`}>
+                            <Icon name="plus" />
+                        </button>
+                        <button onClick={() => setActiveTab('assets')} className={`p-4 rounded-full transition-all ${activeTab === 'assets' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400'}`}>
+                            <Icon name="wallet" />
+                        </button>
+                    </nav>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
