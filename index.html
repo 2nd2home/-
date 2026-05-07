@@ -2,17 +2,29 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>財富管家 Pro</title>
+    
+    <!-- iOS 專用設定：讓網頁看起來像 App -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="財富管家">
+    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { -webkit-tap-highlight-color: transparent; background-color: #F8FAFC; font-family: -apple-system, sans-serif; }
+        body { 
+            -webkit-tap-highlight-color: transparent; 
+            background-color: #F8FAFC; 
+            font-family: -apple-system, system-ui, sans-serif;
+            /* 預留 iPhone 底部橫條空間 */
+            padding-bottom: env(safe-area-inset-bottom);
+        }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
-        input[type="date"] { min-height: 2.5rem; }
+        input[type="date"] { min-height: 2.5rem; -webkit-appearance: none; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-up { animation: slideUp 0.4s ease-out forwards; }
     </style>
@@ -94,10 +106,10 @@
 
             return (
                 <div className="flex flex-col min-h-screen max-w-md mx-auto relative bg-[#F8FAFC]">
-                    <header className="p-6 pt-10 pb-4 bg-white border-b sticky top-0 z-30 flex justify-between items-end">
+                    <header className="p-6 pt-12 pb-4 bg-white border-b sticky top-0 z-30 flex justify-between items-end">
                         <div>
                             <h1 className="text-xl font-black text-emerald-900">財富管家 Pro</h1>
-                            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">Unified Edition v28.1</p>
+                            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">Unified Action v29.0</p>
                         </div>
                         <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 shadow-sm">
                             <Icon name="globe" size={12} className="text-emerald-500" />
@@ -131,7 +143,7 @@
 
         function Dashboard({ assets, transactions, formatMoney, getAssetsTotalAtDate, getAccCash }) {
             const [range, setRange] = useState('month');
-            const [customDate, setCustomDate] = useState({ start: '2026-01-01', end: '2026-05-07' });
+            const [customDate, setCustomDate] = useState({ start: '2026-01-01', end: '2026-12-31' });
             const [showAssets, setShowAssets] = useState(true);
             const [showCash, setShowCash] = useState(true);
 
@@ -283,7 +295,6 @@
 
             return (
                 <div className="space-y-6 animate-slide-up">
-                    {/* 新增/修改 輸入區 (補回功能) */}
                     <form onSubmit={handleAdd} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-4 shadow-sm">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
@@ -308,15 +319,12 @@
                             <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className="bg-slate-50 p-3 rounded-2xl text-xs font-bold outline-none border-none"/>
                             <input type="text" placeholder="項目內容" value={form.category} onChange={e=>setForm({...form, category:e.target.value})} className="bg-slate-50 p-3 rounded-2xl text-xs font-bold outline-none border-none"/>
                         </div>
-                        
                         <input type="number" placeholder="輸入金額" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={`w-full p-4 bg-slate-50 rounded-2xl font-black text-2xl outline-none text-center ${form.type === 'expense' ? 'text-red-500' : 'text-emerald-700'}`} />
-                        
                         <button type="submit" className={`w-full py-4 rounded-[2rem] font-black text-white shadow-lg transition-all active:scale-95 ${editingId ? 'bg-orange-500' : 'bg-emerald-800'}`}>
                             {editingId ? '確認修正紀錄' : '儲存這筆紀錄'}
                         </button>
                     </form>
 
-                    {/* 紀錄查詢區 (包含搜尋與區間統計橫條) */}
                     <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-4 shadow-sm">
                         <div className="flex flex-col gap-3">
                             <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-2xl border border-slate-100">
@@ -332,7 +340,6 @@
                                 ))}
                             </div>
                             
-                            {/* 區間統計橫條 */}
                             <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-50">
                                 <div className="text-center p-2 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
                                     <p className="text-[8px] font-black text-emerald-600 uppercase mb-0.5 tracking-tighter">區間總收入</p>
@@ -352,8 +359,7 @@
                         </div>
                     </div>
 
-                    {/* 紀錄清單區 */}
-                    <div className="space-y-3">
+                    <div className="space-y-3 pb-12">
                         {filtered.map(t => (
                             <div key={t.id} className="bg-white p-5 rounded-2xl border border-emerald-50 flex justify-between items-center shadow-sm">
                                 <div className="flex items-center gap-3">
@@ -422,7 +428,7 @@
                         </button>
                     </form>
 
-                    <div className="space-y-3">
+                    <div className="space-y-3 pb-12">
                         {assets.map(a => (
                             <div key={a.id} className="bg-white p-5 rounded-2xl border border-emerald-50 flex justify-between items-center shadow-sm">
                                 <div className="flex items-center gap-3">
