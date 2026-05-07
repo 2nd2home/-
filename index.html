@@ -1,417 +1,402 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>財富管理 Pro - 萬用版</title>
+    <title>財富管家 Pro</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root {
-            --bg-color: #D0D7D7;
-            --primary-green: #065f46;
-            --emerald-500: #10b981;
-        }
-        body {
-            background-color: var(--bg-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            margin: 0;
-            padding-bottom: 80px;
-            overflow-x: hidden;
-        }
-        .glass-nav {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            border-radius: 30px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-        .card {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        input, select {
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 8px 12px;
-        }
-        .active-tab {
-            background-color: var(--primary-green);
-            color: white;
-        }
-        /* 隱藏捲動條 */
-        ::-webkit-scrollbar { display: none; }
+        body { -webkit-tap-highlight-color: transparent; background-color: #F8FAFC; font-family: -apple-system, sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        input[type="date"] { min-height: 2.5rem; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-slide-up { animation: slideUp 0.4s ease-out forwards; }
     </style>
 </head>
-<body>
+<body class="text-slate-800 antialiased">
+    <div id="root"></div>
 
-    <!-- 頂部導航 -->
-    <div class="fixed top-4 left-0 right-0 z-50 px-4">
-        <div class="glass-nav flex justify-around items-center p-2 max-w-md mx-auto">
-            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="flex-1 py-2 rounded-full text-sm font-medium transition active:scale-95 active-tab">總覽</button>
-            <button onclick="switchTab('assets')" id="btn-assets" class="flex-1 py-2 rounded-full text-sm font-medium transition active:scale-95">資產</button>
-            <button onclick="switchTab('records')" id="btn-records" class="flex-1 py-2 rounded-full text-sm font-medium transition active:scale-95">收支</button>
-        </div>
-    </div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
 
-    <!-- 內容區域 -->
-    <main class="pt-24 px-4 max-w-md mx-auto">
-        
-        <!-- 1. 總覽頁面 -->
-        <section id="page-dashboard">
-            <div class="card p-5 mb-6 bg-gradient-to-br from-emerald-700 to-emerald-900 text-white shadow-xl">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="opacity-80 text-sm">預估淨資產 (TWD)</p>
-                        <h1 id="total-net-wealth" class="text-3xl font-bold mt-1">$ 0</h1>
-                    </div>
-                    <button onclick="runAiAnalysis()" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
-                        <span class="text-xs">✨ AI 診斷</span>
-                    </button>
-                </div>
-                <div id="ai-suggestion" class="mt-4 text-xs bg-white/10 p-3 rounded-lg hidden italic">
-                    AI 分析中...
-                </div>
-            </div>
-
-            <div class="card p-4 mb-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-emerald-900">數據分析</h3>
-                    <div class="flex gap-2">
-                        <button onclick="toggleChartType('line')" class="p-1 rounded bg-gray-100" id="btn-chart-line">📈</button>
-                        <button onclick="toggleChartType('bar')" class="p-1 rounded bg-gray-100" id="btn-chart-bar">📊</button>
-                    </div>
-                </div>
-                <div class="text-xs text-gray-500 mb-2 flex justify-between">
-                    <span id="chart-max-label">區間最高: $0</span>
-                    <span id="chart-sum-label">累計收支: $0</span>
-                </div>
-                <div class="h-40 w-full flex items-end gap-1 relative border-l border-b border-gray-200" id="chart-container">
-                    <!-- 圖表會由 JS 動態生成 -->
-                </div>
-                <div class="flex justify-between mt-2 text-[10px] text-gray-400" id="chart-dates"></div>
-            </div>
-
-            <div class="card p-4">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-emerald-900">資產佔比</h3>
-                    <span id="asset-total-summary" class="text-emerald-700 font-bold">$0</span>
-                </div>
-                <div id="asset-bars" class="space-y-4">
-                    <!-- 資產進度條 -->
-                </div>
-            </div>
-        </section>
-
-        <!-- 2. 資產管理頁面 (包含修改、負債紅字、自動捲動) -->
-        <section id="page-assets" class="hidden">
-            <div class="card p-4 mb-6" id="asset-form-area">
-                <h3 class="font-bold mb-4 flex items-center gap-2">
-                    <span id="asset-form-title">新增資產項目</span>
-                </h3>
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <select id="asset-category" class="w-full text-sm" onchange="updateAssetSubCat()">
-                        <option value="現金">💰 現金</option>
-                        <option value="股票">📈 股票</option>
-                        <option value="基金">🧱 基金</option>
-                        <option value="負債">💳 負債</option>
-                    </select>
-                    <select id="asset-subcat" class="w-full text-sm"></select>
-                </div>
-                <input type="text" id="asset-name" placeholder="項目名稱 (例: 台新活存)" class="w-full mb-3 text-sm">
-                <div class="flex gap-2 mb-3">
-                    <input type="number" id="asset-amount" placeholder="目前市值" class="flex-1 text-sm font-bold" oninput="this.style.color = document.getElementById('asset-category').value === '負債' ? 'red' : 'inherit'">
-                    <input type="number" id="asset-rate" placeholder="美金匯率" value="32.1" class="w-24 text-sm">
-                </div>
-                <button onclick="saveAsset()" class="w-full bg-emerald-800 text-white py-3 rounded-xl font-bold active:bg-emerald-900 shadow-md transition" id="btn-save-asset">確認存檔</button>
-            </div>
-            
-            <div id="asset-list" class="space-y-3"></div>
-        </section>
-
-        <!-- 3. 收支管理頁面 (包含子項目查詢、時間區間、結餘) -->
-        <section id="page-records" class="hidden">
-            <div class="card p-4 mb-6">
-                <div class="flex gap-4 mb-4 border-b pb-2">
-                    <button onclick="setRecordType('expense')" id="type-exp" class="font-bold text-emerald-800 border-b-2 border-emerald-800">支出</button>
-                    <button onclick="setRecordType('income')" id="type-inc" class="font-bold text-gray-400">收入</button>
-                </div>
-                <div id="subcat-chips" class="flex gap-2 overflow-x-auto mb-4 pb-1"></div>
-                <input type="text" id="rec-note" placeholder="備註內容" class="w-full mb-3 text-sm">
-                <div class="flex gap-2 mb-3">
-                    <input type="number" id="rec-amount" placeholder="金額" class="flex-1 text-lg font-bold">
-                    <input type="date" id="rec-date" class="text-sm">
-                </div>
-                <button onclick="saveRecord()" class="w-full bg-emerald-800 text-white py-3 rounded-xl font-bold active:bg-emerald-900 shadow-md" id="btn-save-rec">記下一筆</button>
-            </div>
-
-            <!-- 區間查詢區 -->
-            <div class="card p-4 mb-6 bg-gray-50 border border-gray-100">
-                <div class="flex justify-between items-center mb-3">
-                    <h4 class="text-sm font-bold text-gray-600">紀錄查詢</h4>
-                    <div class="flex gap-2 text-xs">
-                        <label class="flex items-center gap-1"><input type="checkbox" id="filter-show-exp" checked onchange="renderRecords()"> 支出</label>
-                        <label class="flex items-center gap-1"><input type="checkbox" id="filter-show-inc" checked onchange="renderRecords()"> 收入</label>
-                    </div>
-                </div>
-                <div class="flex gap-2 mb-3">
-                    <select id="filter-range" class="text-xs p-1 flex-1" onchange="toggleCustomDate()">
-                        <option value="week">最近一週</option>
-                        <option value="month" selected>本月</option>
-                        <option value="year">今年</option>
-                        <option value="custom">自定義</option>
-                    </select>
-                    <div id="custom-date-box" class="hidden flex gap-1">
-                        <input type="date" id="f-start" class="text-[10px] p-1">
-                        <input type="date" id="f-end" class="text-[10px] p-1">
-                    </div>
-                </div>
-                <div class="grid grid-cols-3 gap-2 text-center">
-                    <div class="p-2 bg-white rounded shadow-sm">
-                        <p class="text-[10px] text-gray-400">總收入</p>
-                        <p class="text-xs font-bold text-emerald-600" id="sum-inc">$0</p>
-                    </div>
-                    <div class="p-2 bg-white rounded shadow-sm">
-                        <p class="text-[10px] text-gray-400">總支出</p>
-                        <p class="text-xs font-bold text-rose-600" id="sum-exp">$0</p>
-                    </div>
-                    <div class="p-2 bg-emerald-50 rounded shadow-sm">
-                        <p class="text-[10px] text-emerald-600">結餘</p>
-                        <p class="text-xs font-bold" id="sum-bal">$0</p>
-                    </div>
-                </div>
-            </div>
-
-            <div id="record-list" class="space-y-2"></div>
-        </section>
-    </main>
-
-    <script>
-        // --- 資料初始化 (從 LocalStorage 讀取) ---
-        let assets = JSON.parse(localStorage.getItem('myAssets')) || [];
-        let records = JSON.parse(localStorage.getItem('myRecords')) || [];
-        let currentRecordType = 'expense';
-        let editTargetId = null;
-
-        // --- 核心儲存功能 (確保更新不丟失) ---
-        function persist() {
-            localStorage.setItem('myAssets', JSON.stringify(assets));
-            localStorage.setItem('myRecords', JSON.stringify(records));
-            renderAll();
-        }
-
-        // --- 介面切換邏輯 ---
-        function switchTab(tab) {
-            ['dashboard', 'assets', 'records'].forEach(t => {
-                document.getElementById(`page-${t}`).classList.add('hidden');
-                document.getElementById(`btn-${t}`).classList.remove('active-tab');
-            });
-            document.getElementById(`page-${tab}`).classList.remove('hidden');
-            document.getElementById(`btn-${tab}`).classList.add('active-tab');
-            renderAll();
-        }
-
-        // --- 資產管理邏輯 ---
-        const subCats = {
-            '現金': ['現金', '活存', '定存'],
-            '股票': ['台股', '美股'],
-            '基金': ['一般', '債券'],
-            '負債': ['現金', '貸款']
+        // --- 常數設定 ---
+        const ASSET_CATEGORIES = {
+            cash: { label: '現金/活存', color: '#10b981', subTypes: ['現金', '活存', '定存'] },
+            stock: { label: '股票', color: '#059669', subTypes: ['台股', '美股'] },
+            fund: { label: '基金', color: '#34d399', subTypes: ['一般基金', '債券基金'] },
+            realestate: { label: '不動產', color: '#6ee7b7', subTypes: ['通用'] },
+            debt: { label: '負債', color: '#f43f5e', subTypes: ['現金', '貸款'] }
         };
 
-        function updateAssetSubCat() {
-            const cat = document.getElementById('asset-category').value;
-            const sub = document.getElementById('asset-subcat');
-            sub.innerHTML = subCats[cat].map(s => `<option value="${s}">${s}</option>`).join('');
-        }
+        const TX_SUB_CATEGORIES = {
+            expense: ['現金', 'LinePay', '信用卡', '其它'],
+            income: ['現金', '轉帳']
+        };
 
-        function saveAsset() {
-            const asset = {
-                id: editTargetId || Date.now(),
-                cat: document.getElementById('asset-category').value,
-                sub: document.getElementById('asset-subcat').value,
-                name: document.getElementById('asset-name').value,
-                amount: parseFloat(document.getElementById('asset-amount').value) || 0,
-                rate: parseFloat(document.getElementById('asset-rate').value) || 1
+        // --- 內置圖示 ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                dashboard: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>,
+                swap: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m7 16 3-3-3-3"></path><path d="m17 8-3 3 3 3"></path><path d="M3 16h7"></path><path d="M21 8h-7"></path></svg>,
+                list: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line></svg>,
+                edit: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"></path></svg>,
+                trash: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>,
+                calendar: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
+                globe: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
             };
-            
-            if (editTargetId) {
-                assets = assets.map(a => a.id === editTargetId ? asset : a);
-                editTargetId = null;
-                document.getElementById('asset-form-title').innerText = "新增資產項目";
-            } else {
-                assets.push(asset);
-            }
-            
-            persist();
-            // 重置表單
-            document.getElementById('asset-name').value = '';
-            document.getElementById('asset-amount').value = '';
-        }
+            return icons[name] || null;
+        };
 
-        function editAsset(id) {
-            const item = assets.find(a => a.id === id);
-            if (!item) return;
-            editTargetId = id;
-            document.getElementById('asset-category').value = item.cat;
-            updateAssetSubCat();
-            document.getElementById('asset-subcat').value = item.sub;
-            document.getElementById('asset-name').value = item.name;
-            document.getElementById('asset-amount').value = item.amount;
-            document.getElementById('asset-rate').value = item.rate;
-            document.getElementById('asset-form-title').innerText = "修改資產項目";
-            // 自動捲動到頂部編輯區
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        // --- 主程式 ---
+        function App() {
+            const today = new Date().toISOString().split('T')[0];
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [usdRate, setUsdRate] = useState(32.5);
 
-        // --- 收支管理邏輯 ---
-        function setRecordType(type) {
-            currentRecordType = type;
-            document.getElementById('type-exp').className = type === 'expense' ? 'font-bold text-emerald-800 border-b-2 border-emerald-800' : 'font-bold text-gray-400';
-            document.getElementById('type-inc').className = type === 'income' ? 'font-bold text-emerald-800 border-b-2 border-emerald-800' : 'font-bold text-gray-400';
-            renderSubCatChips();
-        }
-
-        function renderSubCatChips() {
-            const container = document.getElementById('subcat-chips');
-            const chips = currentRecordType === 'expense' ? ['現金', 'LinePay', '信用卡', '其它'] : ['現金', '轉帳'];
-            container.innerHTML = chips.map(c => `
-                <button onclick="selectChip('${c}')" class="chip px-3 py-1 bg-gray-100 rounded-full text-xs whitespace-nowrap active:bg-emerald-700 active:text-white" data-val="${c}">${c}</button>
-            `).join('');
-            selectChip('現金');
-        }
-
-        let selectedChip = '現金';
-        function selectChip(val) {
-            selectedChip = val;
-            document.querySelectorAll('.chip').forEach(c => {
-                c.classList.toggle('bg-emerald-800', c.dataset.val === val);
-                c.classList.toggle('text-white', c.dataset.val === val);
+            // 資料載入
+            const [assets, setAssets] = useState(() => {
+                const s = localStorage.getItem('wealth_v28_assets');
+                return s ? JSON.parse(s) : [
+                    { id: 'a1', name: '中信活存', type: 'cash', subType: '活存', value: 100000, currency: 'TWD', date: '2026-01-01' },
+                    { id: 's1', name: '台積電', type: 'stock', subType: '台股', value: 500000, currency: 'TWD', date: '2026-01-15' }
+                ];
             });
-        }
+            const [transactions, setTransactions] = useState(() => {
+                const s = localStorage.getItem('wealth_v28_tx');
+                return s ? JSON.parse(s) : [
+                    { id: 't1', type: 'income', subCategory: '轉帳', amount: 75000, category: '薪資', date: '2026-01-05' }
+                ];
+            });
 
-        function saveRecord() {
-            const rec = {
-                id: Date.now(),
-                type: currentRecordType,
-                sub: selectedChip,
-                note: document.getElementById('rec-note').value || '未分類',
-                amount: parseFloat(document.getElementById('rec-amount').value) || 0,
-                date: document.getElementById('rec-date').value || new Date().toISOString().split('T')[0]
+            useEffect(() => {
+                localStorage.setItem('wealth_v28_assets', JSON.stringify(assets));
+                localStorage.setItem('wealth_v28_tx', JSON.stringify(transactions));
+            }, [assets, transactions]);
+
+            const formatMoney = (val) => `NT$ ${Math.floor(val).toLocaleString()}`;
+            const getTwdValue = (v, curr) => curr === 'USD' ? v * usdRate : v;
+
+            // 核心計算：某日期前各資產最新狀態
+            const getAssetsTotalAtDate = (d, list) => {
+                const uniqueNames = [...new Set(list.map(a => a.name))];
+                let sum = 0;
+                uniqueNames.forEach(n => {
+                    const records = list.filter(a => a.name === n && a.date <= d).sort((a,b) => b.date.localeCompare(a.date));
+                    if (records.length > 0) {
+                        const val = getTwdValue(records[0].value, records[0].currency);
+                        sum += (records[0].type === 'debt' ? -val : val);
+                    }
+                });
+                return sum;
             };
-            records.push(rec);
-            persist();
-            document.getElementById('rec-note').value = '';
-            document.getElementById('rec-amount').value = '';
-        }
 
-        // --- 渲染功能 ---
-        function renderAll() {
-            renderDashboard();
-            renderAssetList();
-            renderRecords();
-        }
+            const getAccCash = (d, list) => list.filter(t => t.date <= d).reduce((s, t) => t.type === 'income' ? s + t.amount : s - t.amount, 0);
 
-        function renderDashboard() {
-            // 計算淨資產
-            let net = 0;
-            assets.forEach(a => {
-                const val = a.amount * (a.cat === '股票' && a.sub === '美股' ? a.rate : 1);
-                net += (a.cat === '負債' ? -val : val);
-            });
-            document.getElementById('total-net-wealth').innerText = `$ ${net.toLocaleString()}`;
-            document.getElementById('asset-total-summary').innerText = `$ ${net.toLocaleString()}`;
-
-            // 渲染資產佔比
-            const barContainer = document.getElementById('asset-bars');
-            const cats = ['現金', '股票', '基金', '負債'];
-            barContainer.innerHTML = cats.map(c => {
-                const sum = assets.filter(a => a.cat === c).reduce((s, x) => s + x.amount, 0);
-                const percent = Math.min(100, Math.max(5, (sum / (net || 1)) * 100));
-                return `
-                    <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-gray-500">${c}</span>
-                            <span class="${c==='負債'?'text-rose-600':'font-bold'}">$${sum.toLocaleString()}</span>
+            return (
+                <div className="flex flex-col min-h-screen max-w-md mx-auto relative bg-[#F8FAFC]">
+                    <header className="p-6 pt-10 pb-4 bg-white border-b sticky top-0 z-30 flex justify-between items-end">
+                        <div>
+                            <h1 className="text-xl font-black text-emerald-900">財富管家 Pro</h1>
+                            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">Unified Edition v28.0</p>
                         </div>
-                        <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                            <div class="h-full ${c==='負債'?'bg-rose-500':'bg-emerald-600'}" style="width: ${Math.abs(percent)}%"></div>
+                        <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 shadow-sm">
+                            <Icon name="globe" size={12} className="text-emerald-500" />
+                            <span className="text-[10px] font-black text-emerald-700">USD</span>
+                            <input type="number" value={usdRate} onChange={e=>setUsdRate(Number(e.target.value))} className="w-10 bg-transparent text-[10px] font-black text-emerald-600 outline-none" />
+                        </div>
+                    </header>
+
+                    <main className="flex-1 p-4 pb-32">
+                        {activeTab === 'dashboard' && <Dashboard assets={assets} transactions={transactions} formatMoney={formatMoney} getAssetsTotalAtDate={getAssetsTotalAtDate} getAccCash={getAccCash} />}
+                        {activeTab === 'transactions' && <TransactionsManager transactions={transactions} setTransactions={setTransactions} formatMoney={formatMoney} />}
+                        {activeTab === 'assets' && <AssetsManager assets={assets} setAssets={setAssets} formatMoney={formatMoney} usdRate={usdRate} />}
+                    </main>
+
+                    <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-md glass-card border border-emerald-100 rounded-[2.5rem] p-1.5 shadow-2xl flex z-40">
+                        <NavButton icon="dashboard" label="總覽" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} />
+                        <NavButton icon="swap" label="收支" active={activeTab==='transactions'} onClick={()=>setActiveTab('transactions')} />
+                        <NavButton icon="list" label="資產" active={activeTab==='assets'} onClick={()=>setActiveTab('assets')} />
+                    </nav>
+                </div>
+            );
+        }
+
+        function NavButton({ icon, label, active, onClick }) {
+            return (
+                <button onClick={onClick} className={`flex-1 flex flex-col items-center justify-center py-3 rounded-[2rem] transition-all ${active ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400'}`}>
+                    <Icon name={icon} size={22} /><span className="text-[10px] font-bold mt-1">{label}</span>
+                </button>
+            );
+        }
+
+        // --- 子組件：總覽 ---
+        function Dashboard({ assets, transactions, formatMoney, getAssetsTotalAtDate, getAccCash }) {
+            const [range, setRange] = useState('month');
+            const [customDate, setCustomDate] = useState({ start: '2026-01-01', end: '2026-05-07' });
+            const [showAssets, setShowAssets] = useState(true);
+            const [showCash, setShowCash] = useState(true);
+
+            const timeConfig = useMemo(() => {
+                if (range === 'custom') return customDate;
+                const end = new Date('2026-05-07');
+                let start = new Date(end);
+                if (range === 'week') start.setDate(end.getDate() - 7);
+                else if (range === 'month') start.setMonth(end.getMonth() - 1);
+                else if (range === 'halfYear') start.setMonth(end.getMonth() - 6);
+                else start.setFullYear(end.getFullYear() - 1);
+                return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+            }, [range, customDate]);
+
+            const trendData = useMemo(() => {
+                const data = [];
+                let curr = new Date(timeConfig.start);
+                const end = new Date(timeConfig.end);
+                if (isNaN(curr.getTime())) return [];
+                let safety = 0;
+                while (curr <= end && safety < 400) {
+                    const dStr = curr.toISOString().split('T')[0];
+                    const assetVal = getAssetsTotalAtDate(dStr, assets) + getAccCash(dStr, transactions);
+                    const dayTx = transactions.filter(t => t.date === dStr);
+                    const netChange = dayTx.reduce((s,t) => t.type === 'income' ? s + t.amount : s - t.amount, 0);
+                    data.push({ date: dStr, asset: assetVal, net: netChange });
+                    curr.setDate(curr.getDate() + 1);
+                    safety++;
+                }
+                return data;
+            }, [timeConfig, assets, transactions]);
+
+            const latestAsset = trendData.length > 0 ? trendData[trendData.length-1].asset : 0;
+            const maxAsset = Math.max(...trendData.map(d => d.asset), 0);
+            const totalNet = transactions.filter(t => t.date >= timeConfig.start && t.date <= timeConfig.end).reduce((s, t) => t.type === 'income' ? s + t.amount : s - t.amount, 0);
+
+            return (
+                <div className="space-y-6 animate-slide-up">
+                    <div className="bg-emerald-900 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
+                        <p className="text-emerald-400 text-[10px] font-black uppercase tracking-widest mb-1">預估淨資產 (聯動收支)</p>
+                        <h2 className="text-4xl font-black tracking-tighter">{formatMoney(latestAsset)}</h2>
+                        <div className="flex gap-8 mt-6">
+                            <div><p className="text-[9px] font-bold text-emerald-500 uppercase">區間最高</p><p className="font-bold text-sm">{formatMoney(maxAsset)}</p></div>
+                            <div><p className="text-[9px] font-bold text-emerald-500 uppercase">區間淨收支</p><p className="font-bold text-sm">{totalNet >= 0 ? '+' : ''}{totalNet.toLocaleString()}</p></div>
                         </div>
                     </div>
-                `;
-            }).join('');
 
-            // 圖表渲染 (簡化版)
-            const chart = document.getElementById('chart-container');
-            chart.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-[10px] text-gray-300">數據累積中...</div>`;
-        }
-
-        function renderAssetList() {
-            const list = document.getElementById('asset-list');
-            list.innerHTML = assets.map(a => `
-                <div class="card p-3 flex justify-between items-center border-l-4 ${a.cat==='負債'?'border-rose-500':'border-emerald-600'}">
-                    <div>
-                        <p class="font-bold text-sm">${a.name} <span class="text-[10px] font-normal text-gray-400">· ${a.sub}</span></p>
-                        <p class="text-xs text-gray-400">${a.cat}</p>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar justify-center w-full">
+                            {['week', 'month', 'halfYear', 'year', 'custom'].map(id => (
+                                <button key={id} onClick={() => setRange(id)} className={`px-4 py-2 rounded-full text-[10px] font-bold transition-all ${range === id ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-400 border border-slate-100'}`}>
+                                    {id === 'week' ? '一週' : id === 'month' ? '一月' : id === 'halfYear' ? '半年' : id === 'year' ? '一年' : '自訂'}
+                                </button>
+                            ))}
+                        </div>
+                        {range === 'custom' && (
+                            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-emerald-100 shadow-sm animate-slide-up">
+                                <input type="date" value={customDate.start} onChange={e=>setCustomDate({...customDate, start:e.target.value})} className="bg-transparent text-[10px] font-bold outline-none text-slate-600" />
+                                <span className="text-slate-300">~</span>
+                                <input type="date" value={customDate.end} onChange={e=>setCustomDate({...customDate, end:e.target.value})} className="bg-transparent text-[10px] font-bold outline-none text-slate-600" />
+                            </div>
+                        )}
                     </div>
-                    <div class="text-right flex items-center gap-3">
-                        <span class="font-bold ${a.cat==='負債'?'text-rose-600':''}">${a.cat==='負債'?'-':''}$${a.amount.toLocaleString()}</span>
-                        <button onclick="editAsset(${a.id})" class="text-gray-300 text-lg">✎</button>
+
+                    <div className="bg-white p-6 rounded-[2rem] border border-emerald-50 shadow-sm">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">數據分析趨勢</h3>
+                            <div className="flex gap-2">
+                                <button onClick={()=>setShowAssets(!showAssets)} className={`p-2 rounded-xl border transition-all ${showAssets ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-300'}`}><Icon name="dashboard" size={14}/></button>
+                                <button onClick={()=>setShowCash(!showCash)} className={`p-2 rounded-xl border transition-all ${showCash ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-300'}`}><Icon name="swap" size={14}/></button>
+                            </div>
+                        </div>
+                        <Chart data={trendData} showAssets={showAssets} showCash={showCash} />
                     </div>
                 </div>
-            `).join('');
+            );
         }
 
-        function renderRecords() {
-            const list = document.getElementById('record-list');
-            const showExp = document.getElementById('filter-show-exp').checked;
-            const showInc = document.getElementById('filter-show-inc').checked;
-            
-            const filtered = records.filter(r => {
-                if (r.type === 'expense' && !showExp) return false;
-                if (r.type === 'income' && !showInc) return false;
-                return true;
-            }).reverse();
+        function Chart({ data, showAssets, showCash }) {
+            if (data.length < 2) return <div className="h-40 flex items-center justify-center text-slate-200 italic text-xs font-bold">數據累積中...</div>;
+            const PAD = { t: 20, r: 20, b: 30, l: 65 }, W = 1000, H = 400;
+            const allV = [...(showAssets ? data.map(d=>d.asset) : []), ...(showCash ? data.map(d=>d.net) : []), 0];
+            const max = Math.max(...allV) * 1.1, min = Math.min(...allV) * 1.1, range = (max - min) || 1;
+            const getX = (i) => PAD.l + (i / (data.length - 1)) * (W - PAD.l - PAD.r);
+            const getY = (v) => PAD.t + (1 - (v - min) / range) * (H - PAD.t - PAD.b);
+            const ticks = [min, min + range/2, max];
 
-            let inc = 0, exp = 0;
-            list.innerHTML = filtered.map(r => {
-                if (r.type === 'income') inc += r.amount; else exp += r.amount;
-                return `
-                    <div class="flex justify-between items-center p-3 bg-white rounded-lg border-b border-gray-50">
-                        <div>
-                            <p class="text-sm font-medium">${r.note}</p>
-                            <p class="text-[10px] text-gray-400">${r.date} · ${r.sub}</p>
-                        </div>
-                        <span class="font-bold ${r.type==='income'?'text-emerald-600':'text-rose-500'}">
-                            ${r.type==='income'?'+':'-'}$${r.amount.toLocaleString()}
-                        </span>
+            return (
+                <div className="w-full">
+                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto overflow-visible">
+                        {ticks.map((t, i) => (
+                            <g key={i}>
+                                <line x1={PAD.l} y1={getY(t)} x2={W - PAD.r} y2={getY(t)} stroke="#F1F5F9" strokeWidth="2" />
+                                <text x={PAD.l - 12} y={getY(t) + 6} textAnchor="end" className="fill-slate-300 text-[24px] font-bold">{Math.round(t/10000)}萬</text>
+                            </g>
+                        ))}
+                        {showCash && data.map((d, i) => {
+                            const bw = ((W-PAD.l-PAD.r)/data.length)*0.7;
+                            const h = Math.abs(getY(0)-getY(d.net)), yPos = d.net >= 0 ? getY(d.net) : getY(0);
+                            return <rect key={i} x={getX(i)-bw/2} y={yPos} width={bw} height={Math.max(h, 2)} fill={d.net >= 0 ? "#10b981" : "#f43f5e"} opacity="0.3" rx="4" />;
+                        })}
+                        {showAssets && <path d={`M ${data.map((d, i) => `${getX(i)} ${getY(d.asset)}`).join(' L ')}`} fill="none" stroke="#10b981" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />}
+                        <text x={getX(0)} y={H - 5} className="fill-slate-300 text-[20px] font-bold font-mono">{data[0].date.slice(5)}</text>
+                        <text x={getX(data.length-1)} y={H - 5} textAnchor="end" className="fill-slate-300 text-[20px] font-bold font-mono">{data[data.length-1].date.slice(5)}</text>
+                    </svg>
+                </div>
+            );
+        }
+
+        // --- 子組件：收支明細 ---
+        function TransactionsManager({ transactions, setTransactions, formatMoney }) {
+            const today = new Date().toISOString().split('T')[0];
+            const [form, setForm] = useState({ type: 'expense', amount: '', category: '', date: today, subCategory: '現金' });
+            const [editingId, setEditingId] = useState(null);
+            const [filter, setFilter] = useState({ start: '2026-01-01', end: '2026-12-31', query: '', subFilter: [] });
+
+            const handleAdd = (e) => {
+                e.preventDefault();
+                if (!form.amount || !form.category) return;
+                const item = { ...form, id: editingId || Date.now().toString(), amount: Number(form.amount) };
+                if (editingId) setTransactions(transactions.map(t => t.id === editingId ? item : t).sort((a,b)=>b.date.localeCompare(a.date)));
+                else setTransactions([item, ...transactions].sort((a,b)=>b.date.localeCompare(a.date)));
+                setForm({ ...form, amount: '', category: '', date: today }); setEditingId(null);
+            };
+
+            const toggleSubFilter = (sub) => setFilter(f => ({ ...f, subFilter: f.subFilter.includes(sub) ? f.subFilter.filter(s=>s!==sub) : [...f.subFilter, sub] }));
+
+            const filtered = transactions.filter(t => {
+                const dateMatch = t.date >= filter.start && t.date <= filter.end;
+                const queryMatch = !filter.query || t.category.includes(filter.query);
+                const subMatch = filter.subFilter.length === 0 || filter.subFilter.includes(t.subCategory);
+                return dateMatch && queryMatch && subMatch;
+            });
+
+            return (
+                <div className="space-y-6 animate-slide-up">
+                    <div className="bg-white p-6 rounded-[2.5rem] border border-emerald-100 shadow-sm">
+                        <h3 className="text-xs font-black text-emerald-700 uppercase tracking-widest mb-6">{editingId?'修改紀錄':'快速記帳'}</h3>
+                        <form onSubmit={handleAdd} className="space-y-4">
+                            <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl mb-2">
+                                <button type="button" onClick={()=>setForm({...form, type:'expense', subCategory: '現金'})} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${form.type==='expense'?'bg-red-500 text-white shadow-md':'text-slate-400'}`}>支出</button>
+                                <button type="button" onClick={()=>setForm({...form, type:'income', subCategory: '現金'})} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${form.type==='income'?'bg-emerald-600 text-white shadow-md':'text-slate-400'}`}>收入</button>
+                            </div>
+                            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                                {TX_SUB_CATEGORIES[form.type].map(s => (
+                                    <button key={s} type="button" onClick={()=>setForm({...form, subCategory:s})} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border ${form.subCategory===s?'bg-emerald-100 border-emerald-200 text-emerald-700':'bg-white text-slate-300 border-slate-100'}`}>{s}</button>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className="w-full p-3 bg-slate-50 rounded-2xl outline-none font-bold text-xs" />
+                                <input type="text" placeholder="項目內容" value={form.category} onChange={e=>setForm({...form, category:e.target.value})} className="w-full p-3 bg-slate-50 rounded-2xl outline-none font-bold text-xs" />
+                            </div>
+                            <input type="number" placeholder="金額" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl font-black text-2xl outline-none" />
+                            <div className="flex gap-2">
+                                <button className="flex-1 bg-emerald-800 text-white py-4 rounded-[2rem] font-black shadow-lg">儲存</button>
+                                {editingId && <button type="button" onClick={()=>setEditingId(null)} className="px-6 bg-slate-100 text-slate-400 rounded-[2rem] font-bold text-xs">取消</button>}
+                            </div>
+                        </form>
                     </div>
-                `;
-            }).join('');
 
-            document.getElementById('sum-inc').innerText = `$${inc.toLocaleString()}`;
-            document.getElementById('sum-exp').innerText = `$${exp.toLocaleString()}`;
-            document.getElementById('sum-bal').innerText = `$${(inc - exp).toLocaleString()}`;
-            document.getElementById('sum-bal').className = `text-xs font-bold ${(inc-exp)>=0?'text-emerald-600':'text-rose-600'}`;
+                    <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-4 shadow-sm">
+                        <div className="flex flex-col gap-3">
+                            <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                                <input type="date" value={filter.start} onChange={e=>setFilter({...filter, start:e.target.value})} className="bg-transparent text-[10px] font-bold outline-none w-24"/>
+                                <span className="text-slate-300">~</span>
+                                <input type="date" value={filter.end} onChange={e=>setFilter({...filter, end:e.target.value})} className="bg-transparent text-[10px] font-bold outline-none w-24"/>
+                            </div>
+                            <input type="text" placeholder="關鍵字搜尋..." value={filter.query} onChange={e=>setFilter({...filter, query:e.target.value})} className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-xs font-bold" />
+                            <div className="flex gap-1 overflow-x-auto no-scrollbar py-1">
+                                {['現金','LinePay','信用卡','轉帳','其它'].map(sub => (
+                                    <button key={sub} onClick={()=>toggleSubFilter(sub)} className={`px-3 py-1.5 rounded-xl text-[9px] font-black border transition-all ${filter.subFilter.includes(sub)?'bg-emerald-600 text-white border-emerald-600':'bg-white text-slate-300 border-slate-100'}`}>{sub}</button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        {filtered.map(t => (
+                            <div key={t.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-emerald-50">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-1 h-8 rounded-full ${t.type==='income'?'bg-emerald-500':'bg-red-500'}`}></div>
+                                    <div><p className="font-bold text-sm text-slate-700">{t.category} <span className="text-[9px] font-normal text-slate-300">· {t.subCategory}</span></p><p className="text-[9px] font-bold text-slate-300 uppercase">{t.date}</p></div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className={`font-black ${t.type==='income'?'text-emerald-600':'text-red-500'}`}>{t.type==='income'?'+':'-'}{t.amount.toLocaleString()}</span>
+                                    <button onClick={()=>{setEditingId(t.id); setForm(t); window.scrollTo({top:0, behavior:'smooth'})}} className="p-2 text-slate-200 hover:text-emerald-600"><Icon name="edit" size={16}/></button>
+                                    <button onClick={()=>setTransactions(transactions.filter(x=>x.id!==t.id))} className="p-2 text-slate-200 hover:text-red-500"><Icon name="trash" size={16}/></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
         }
 
-        function toggleCustomDate() {
-            document.getElementById('custom-date-box').classList.toggle('hidden', document.getElementById('filter-range').value !== 'custom');
+        // --- 子組件：資產明細 ---
+        function AssetsManager({ assets, setAssets, formatMoney, usdRate }) {
+            const today = new Date().toISOString().split('T')[0];
+            const [form, setForm] = useState({ name: '', type: 'cash', subType: '活存', value: '', currency: 'TWD', date: today });
+            const [editingId, setEditingId] = useState(null);
+
+            const handleAdd = (e) => {
+                e.preventDefault();
+                if (!form.name || !form.value) return;
+                const item = { ...form, id: editingId || Date.now().toString(), value: Number(form.value) };
+                if (editingId) setAssets(assets.map(a => a.id === editingId ? item : a).sort((a,b)=>b.date.localeCompare(a.date)));
+                else setAssets([item, ...assets].sort((a,b)=>b.date.localeCompare(a.date)));
+                setForm({ ...form, name: '', value: '', date: today }); setEditingId(null);
+            };
+
+            return (
+                <div className="space-y-6 animate-slide-up">
+                    <div className="bg-white p-6 rounded-[2.5rem] border border-emerald-50 shadow-sm">
+                        <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-6">{editingId?'修正資產狀態':'新增資產紀錄'}</h3>
+                        <form onSubmit={handleAdd} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-2">
+                                <select value={form.type} onChange={e=>setForm({...form, type: e.target.value, subType: ASSET_CATEGORIES[e.target.value].subTypes[0]})} className="p-3 bg-slate-50 rounded-2xl outline-none font-bold text-xs">{Object.keys(ASSET_CATEGORIES).map(k=><option key={k} value={k}>{ASSET_CATEGORIES[k].label}</option>)}</select>
+                                <select value={form.currency} onChange={e=>setForm({...form, currency: e.target.value})} className="p-3 bg-slate-50 rounded-2xl outline-none font-bold text-xs"><option value="TWD">TWD (台幣)</option><option value="USD">USD (美金)</option></select>
+                            </div>
+                            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                                {ASSET_CATEGORIES[form.type].subTypes.map(s => (
+                                    <button key={s} type="button" onClick={()=>setForm({...form, subType:s})} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border ${form.subType===s?'bg-emerald-600 text-white shadow-md':'bg-white text-slate-300 border-slate-100'}`}>{s}</button>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className="w-full p-3 bg-slate-50 rounded-2xl outline-none font-bold text-xs" />
+                                <input type="text" placeholder="項目名稱" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className="w-full p-3 bg-slate-50 rounded-2xl outline-none font-bold text-xs" />
+                            </div>
+                            <input type="number" placeholder="目前餘額 / 市值" value={form.value} onChange={e=>setForm({...form, value:e.target.value})} className={`w-full p-4 bg-slate-50 rounded-2xl font-black text-2xl outline-none ${form.type==='debt'?'text-red-500':'text-emerald-700'}`} />
+                            <div className="flex gap-2">
+                                <button className="flex-1 bg-emerald-800 text-white py-4 rounded-[2rem] font-black shadow-lg">確認</button>
+                                {editingId && <button type="button" onClick={()=>setEditingId(null)} className="px-6 bg-slate-100 text-slate-400 rounded-[2rem] font-bold text-xs">取消</button>}
+                            </div>
+                        </form>
+                    </div>
+
+                    <div className="space-y-3">
+                        {assets.map(a => (
+                            <div key={a.id} className="bg-white p-5 rounded-2xl border border-emerald-50 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-10 rounded-full" style={{ backgroundColor: ASSET_CATEGORIES[a.type].color }}></div>
+                                    <div><p className="font-bold text-sm text-slate-700">{a.name} <span className="text-[9px] font-normal text-slate-300">· {a.subType}</span></p><p className="text-[9px] font-bold text-slate-300 uppercase">{a.date}</p></div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="text-right mr-1">
+                                        <p className={`font-black ${a.type==='debt'?'text-red-500':'text-slate-800'}`}>{formatMoney(a.currency === 'USD' ? a.value * usdRate : a.value)}</p>
+                                        {a.currency === 'USD' && <p className="text-[9px] text-slate-400 font-bold">${a.value.toLocaleString()} USD</p>}
+                                    </div>
+                                    <button onClick={()=>{setEditingId(a.id); setForm(a); window.scrollTo({top:0, behavior:'smooth'})}} className="p-2 text-slate-200 hover:text-emerald-600"><Icon name="edit" size={16}/></button>
+                                    <button onClick={()=>setAssets(assets.filter(x=>x.id!==a.id))} className="p-2 text-slate-200 hover:text-red-500"><Icon name="trash" size={16}/></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
         }
 
-        // --- 初始化執行 ---
-        updateAssetSubCat();
-        renderSubCatChips();
-        renderAll();
-
-        // --- AI 模擬功能 ---
-        async function runAiAnalysis() {
-            const box = document.getElementById('ai-suggestion');
-            box.classList.remove('hidden');
-            box.innerText = "Gemini AI 正在分析資產配置...";
-            setTimeout(() => {
-                box.innerText = "✨ AI 建議：您的負債佔比約 15%，處於健康範圍。建議將活存部分的 20% 轉入定存或基金，以提高抗通膨能力。";
-            }, 1500);
-        }
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
